@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <title>Voxel Flight — tablet edition + inventory</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="overlay">
+    <h1>Voxel Flight</h1>
+    <p><b>W A S D</b> или левый джойстик — движение</p>
+    <p><b>Пробел / ▲</b> — вверх, <b>Shift / ▼</b> — вниз</p>
+    <p><b>Тап по слоту</b> внизу — выбор блока</p>
+    <p><b>Кнопка "Режим"</b> — ставить / ломать</p>
+    <p><b>🎒 Инвентарь</b>: E (ПК) или кнопка 🎒</p>
+    <button id="startBtn">Начать</button>
+  </div>
+
+  <div id="hud">
+    <div id="crosshair"></div>
+
+    <div id="help">
+      <b>Режим полёта</b> (как креатив).<br>
+      Блоки и вода — объёмные, пройти сквозь них нельзя.<br><br>
+      Инвентарь: ломай блоки → они добавляются. Ставь блоки → расходуются.
+    </div>
+
+    <div id="hotbar"></div>
+
+    <div id="info">
+      <div>XYZ: <span id="pos"></span></div>
+      <div>Блок: <span id="blockName"></span></div>
+    </div>
+
+    <div id="invBtn">
+      <span class="icon">🎒</span>
+      <span>Инвентарь</span>
+    </div>
+
+    <div id="modeToggle">
+      <span class="icon">🧱</span>
+      <span id="modeText">Режим: ломать</span>
+    </div>
+
+    <div id="joystickLeft">
+      <div class="outer"></div>
+      <div class="inner" id="joystickHandle"></div>
+    </div>
+    <div id="btnUp">▲</div>
+    <div id="btnDown">▼</div>
+  </div>
+
+  <!-- Inventory UI -->
+  <div id="invOverlay">
+    <div id="invPanel">
+      <div id="invHeader">
+        <b>Инвентарь (тап/клик по предмету — выбрать)</b>
+        <button id="invClose">Закрыть</button>
+      </div>
+      <div id="invGrid"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
