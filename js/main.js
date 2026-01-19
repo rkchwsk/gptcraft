@@ -108,7 +108,26 @@
 
   const blockGeo = new THREE.BoxGeometry(1,1,1);
   const worldBlocks = new Map(); // key "x,y,z" -> mesh
+  const VIEW_DISTANCE = 45;
+  const VIEW_DISTANCE_Y = 20;
+  const VISIBILITY_UPDATE_INTERVAL = 0.25;
+  let visibleMeshes = [];
   function keyFromXYZ(x,y,z){ return x + "," + y + "," + z; }
+  function isWithinView(pos){
+    const dx = pos.x - player.position.x;
+    const dy = pos.y - player.position.y;
+    const dz = pos.z - player.position.z;
+    if (Math.abs(dy) > VIEW_DISTANCE_Y) return false;
+    return (dx*dx + dz*dz) <= VIEW_DISTANCE * VIEW_DISTANCE;
+  }
+  function updateVisibility(){
+    visibleMeshes = [];
+    for (const mesh of worldBlocks.values()) {
+      const within = isWithinView(mesh.position);
+      mesh.visible = within;
+      if (within) visibleMeshes.push(mesh);
+    }
+  }
 
   function addBlock(x,y,z,blockId) {
     const key = keyFromXYZ(x,y,z);
@@ -119,6 +138,8 @@
     mesh.castShadow = !blockTypes[blockId]?.isWater;
     mesh.receiveShadow = true;
     mesh.userData.blockId = blockId;
+    mesh.visible = isWithinView(mesh.position);
+    if (mesh.visible) visibleMeshes.push(mesh);
     scene.add(mesh);
     worldBlocks.set(key, mesh);
     return true;
@@ -131,6 +152,8 @@
     const id = m.userData.blockId;
     scene.remove(m);
     worldBlocks.delete(key);
+    const idx = visibleMeshes.indexOf(m);
+    if (idx >= 0) visibleMeshes.splice(idx, 1);
     return id;
   }
 
@@ -159,6 +182,7 @@
     removeBlock,
     keyFromXYZ
   });
+  updateVisibility();
 
   // ===== Collisions =====
   const PLAYER_RADIUS = 0.35;
@@ -444,7 +468,7 @@
 
   function getBlockIntersection(){
     raycaster.setFromCamera(pointer, camera);
-    const objects = Array.from(worldBlocks.values());
+    const objects = visibleMeshes.length ? visibleMeshes : Array.from(worldBlocks.values()).filter(m => m.visible);
     const intersects = raycaster.intersectObjects(objects, false);
     return intersects[0] || null;
   }
@@ -669,11 +693,17 @@
 
   // ===== Render loop =====
   let prevTime = performance.now();
+  let visibilityTimer = 0;
   function animate(now){
     const delta = Math.min(0.05, (now - prevTime)/1000);
     prevTime = now;
 
     updateMovement(delta);
+    visibilityTimer += delta;
+    if (visibilityTimer >= VISIBILITY_UPDATE_INTERVAL) {
+      updateVisibility();
+      visibilityTimer = 0;
+    }
 
     const p = player.position;
     posEl.textContent = `${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}`;
