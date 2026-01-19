@@ -108,7 +108,7 @@
 
   const blockGeo = new THREE.BoxGeometry(1,1,1);
   const worldBlocks = new Map(); // key "x,y,z" -> mesh
-  const VIEW_DISTANCE = 45;
+  const VIEW_DISTANCE = 25;
   const VIEW_DISTANCE_Y = 20;
   const VISIBILITY_UPDATE_INTERVAL = 0.25;
   let visibleMeshes = [];
