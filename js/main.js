@@ -30,21 +30,6 @@
 
   let gameMode = 'creative';
   let interactionManager = null;
-  const MAX_HEALTH = 100;
-  const MAX_FOOD = 100;
-  const FOOD_DECAY_RATE = 2.5;
-  const APPLE_PIE_FOOD = 35;
-  const APPLE_PIE_BLOCK_ID = 10;
-  let health = MAX_HEALTH;
-  let food = MAX_FOOD;
-  let verticalVelocity = 0;
-  let isGrounded = false;
-  let fallStartY = null;
-
-  function updateSurvivalHud(){
-    healthFill.style.width = `${(health / MAX_HEALTH) * 100}%`;
-    foodFill.style.width = `${(food / MAX_FOOD) * 100}%`;
-  }
 
   function setGameMode(mode){
     gameMode = mode;
@@ -238,6 +223,21 @@
   const keyState = {};
 
   let joyForward = 0, joyRight = 0, joyUp = 0;
+  const MAX_HEALTH = 100;
+  const MAX_FOOD = 100;
+  const FOOD_DECAY_RATE = 2.5;
+  const APPLE_PIE_FOOD = 35;
+  const APPLE_PIE_BLOCK_ID = 10;
+  let health = MAX_HEALTH;
+  let food = MAX_FOOD;
+  let verticalVelocity = 0;
+  let isGrounded = false;
+  let fallStartY = null;
+
+  function updateSurvivalHud(){
+    healthFill.style.width = `${(health / MAX_HEALTH) * 100}%`;
+    foodFill.style.width = `${(food / MAX_FOOD) * 100}%`;
+  }
 
   function onKey(e,down){ keyState[e.code] = down; }
   window.addEventListener('keydown', e => onKey(e,true));
