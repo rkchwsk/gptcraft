@@ -14,6 +14,13 @@
     <p><b>Тап по слоту</b> внизу — выбор блока</p>
     <p><b>Кнопка "Режим"</b> — ставить / ломать</p>
     <p><b>🎒 Инвентарь</b>: E (ПК) или кнопка 🎒</p>
+    <div id="modeSelect">
+      <p><b>Режим игры</b></p>
+      <div class="modeButtons">
+        <button class="modeBtn active" data-mode="creative">Креатив</button>
+        <button class="modeBtn" data-mode="survival">Выживание</button>
+      </div>
+    </div>
     <button id="startBtn">Начать</button>
   </div>
 
@@ -31,6 +38,21 @@
     <div id="info">
       <div>XYZ: <span id="pos"></span></div>
       <div>Блок: <span id="blockName"></span></div>
+    </div>
+
+    <div id="survivalHud">
+      <div class="stat">
+        <span>Здоровье</span>
+        <div class="bar">
+          <div class="fill" id="healthFill"></div>
+        </div>
+      </div>
+      <div class="stat">
+        <span>Еда</span>
+        <div class="bar">
+          <div class="fill" id="foodFill"></div>
+        </div>
+      </div>
     </div>
 
     <div id="invBtn">

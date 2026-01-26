@@ -6,7 +6,9 @@
     keyFromXYZ,
     worldSize = 128,
     treeCount = 12,
-    lakeRadius = 6
+    lakeRadius = 6,
+    applePieCount = 35,
+    applePieBlockId = 10
   }) {
     const half = worldSize / 2;
 
@@ -54,6 +56,34 @@
       const tx = Math.floor(Math.random() * worldSize - half);
       const tz = Math.floor(Math.random() * worldSize - half);
       addTreeAt(tx, tz);
+    }
+
+    function findSurfaceY(x, z) {
+      for (let y = 20; y >= 0; y--) {
+        const key = keyFromXYZ(x, y, z);
+        const block = worldBlocks.get(key);
+        if (block) {
+          return { y: y + 1, blockId: block.userData.blockId };
+        }
+      }
+      return { y: 1, blockId: null };
+    }
+
+    function addApplePieAt(x, z) {
+      const { y, blockId } = findSurfaceY(x, z);
+      if (blockId === 9) return false;
+      const key = keyFromXYZ(x, y, z);
+      if (worldBlocks.has(key)) return false;
+      return addBlock(x, y, z, applePieBlockId);
+    }
+
+    let placedPies = 0;
+    let attempts = 0;
+    while (placedPies < applePieCount && attempts < applePieCount * 6) {
+      const px = Math.floor(Math.random() * worldSize - half);
+      const pz = Math.floor(Math.random() * worldSize - half);
+      if (addApplePieAt(px, pz)) placedPies++;
+      attempts++;
     }
 
     for (let x = -lakeRadius; x <= lakeRadius; x++) {

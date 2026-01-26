@@ -85,7 +85,7 @@
             const removedId = removeBlock(x,y,z);
             if(removedId !== null){
               addToInv(removedId, 1);
-              return { changed: true, inventoryChanged: true };
+              return { changed: true, inventoryChanged: true, removedId };
             }
             return { changed: false };
           }
