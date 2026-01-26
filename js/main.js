@@ -2,8 +2,8 @@
   const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xdde7ff);
-  scene.fog = new THREE.Fog(0xdde7ff, 50, 200);
+  scene.background = new THREE.Color(0x000000);
+  scene.fog = new THREE.Fog(0x000000, 50, 200);
 
   const renderer = new THREE.WebGLRenderer({ antialias:true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -157,23 +157,18 @@
     return id;
   }
 
-  // ===== Inventory logic =====
-  const invCounts = new Map(); // blockId -> count
-  function getCount(id){ return invCounts.get(id) ?? 0; }
-  function setCount(id, v){ invCounts.set(id, Math.max(0, Math.floor(v))); }
-  function addToInv(id, delta){ setCount(id, getCount(id) + delta); }
-  function canSpend(id, delta){ return getCount(id) >= delta; }
-  function spend(id, delta){
-    if(!canSpend(id, delta)) return false;
-    setCount(id, getCount(id) - delta);
-    return true;
-  }
-
-  // Стартовый набор (чтобы можно было строить сразу)
-  for (const t of blockTypes) {
-    // воды меньше, остального больше
-    setCount(t.id, t.isWater ? 64 : 256);
-  }
+  const interactionManager = createPlayerInteractionManager({
+    player,
+    camera,
+    worldBlocks,
+    blockTypes,
+    addBlock,
+    removeBlock,
+    keyFromXYZ,
+    getVisibleMeshes: () => (
+      visibleMeshes.length ? visibleMeshes : Array.from(worldBlocks.values()).filter(m => m.visible)
+    )
+  });
 
   // ===== World generation =====
   generateWorld({
@@ -183,38 +178,6 @@
     keyFromXYZ
   });
   updateVisibility();
-
-  // ===== Collisions =====
-  const PLAYER_RADIUS = 0.35;
-  function isPositionColliding(pos){
-    const r = PLAYER_RADIUS;
-    const r2 = r*r;
-    const minX = Math.floor(pos.x - r);
-    const maxX = Math.floor(pos.x + r);
-    const minY = Math.floor(pos.y - r);
-    const maxY = Math.floor(pos.y + r);
-    const minZ = Math.floor(pos.z - r);
-    const maxZ = Math.floor(pos.z + r);
-
-    for(let x=minX; x<=maxX; x++){
-      for(let y=minY; y<=maxY; y++){
-        for(let z=minZ; z<=maxZ; z++){
-          const m = worldBlocks.get(keyFromXYZ(x,y,z));
-          if(!m) continue;
-
-          const bx = x, by = y, bz = z;
-          const closestX = Math.max(bx, Math.min(pos.x, bx+1));
-          const closestY = Math.max(by, Math.min(pos.y, by+1));
-          const closestZ = Math.max(bz, Math.min(pos.z, bz+1));
-          const dx = pos.x - closestX;
-          const dy = pos.y - closestY;
-          const dz = pos.z - closestZ;
-          if (dx*dx + dy*dy + dz*dz < r2) return true;
-        }
-      }
-    }
-    return false;
-  }
 
   // ===== Flight movement =====
   const direction = new THREE.Vector3();
@@ -264,13 +227,13 @@
     const newPos = player.position.clone();
 
     newPos.x += move.x;
-    if(isPositionColliding(newPos)) newPos.x = player.position.x;
+    if(interactionManager.isPositionColliding(newPos)) newPos.x = player.position.x;
 
     newPos.y += move.y;
-    if(isPositionColliding(newPos)) newPos.y = player.position.y;
+    if(interactionManager.isPositionColliding(newPos)) newPos.y = player.position.y;
 
     newPos.z += move.z;
-    if(isPositionColliding(newPos)) newPos.z = player.position.z;
+    if(interactionManager.isPositionColliding(newPos)) newPos.z = player.position.z;
 
     player.position.copy(newPos);
   }
@@ -364,7 +327,7 @@
 
       const cnt = document.createElement('span');
       cnt.className = 'cnt';
-      cnt.textContent = getCount(t.id);
+      cnt.textContent = interactionManager.getCount(t.id);
       slot.appendChild(cnt);
 
       hotbar.appendChild(slot);
@@ -394,7 +357,7 @@
       name.textContent = t.name;
       const count = document.createElement('div');
       count.className = 'invCount';
-      count.textContent = `Кол-во: ${getCount(t.id)}`;
+      count.textContent = `Кол-во: ${interactionManager.getCount(t.id)}`;
 
       meta.appendChild(name);
       meta.appendChild(count);
@@ -462,63 +425,13 @@
     }
   });
 
-  // ===== Raycast edit =====
-  const raycaster = new THREE.Raycaster();
-  const pointer = new THREE.Vector2(0,0);
-
-  function getBlockIntersection(){
-    raycaster.setFromCamera(pointer, camera);
-    const objects = visibleMeshes.length ? visibleMeshes : Array.from(worldBlocks.values()).filter(m => m.visible);
-    const intersects = raycaster.intersectObjects(objects, false);
-    return intersects[0] || null;
-  }
-
   function performEdit(action){
     if(inventoryOpen) return;
-
-    const hit = getBlockIntersection();
-    if(!hit) return;
-
-    const hitPos = hit.object.position;
-    const x = Math.floor(hitPos.x);
-    const y = Math.floor(hitPos.y);
-    const z = Math.floor(hitPos.z);
-
-    if(action === 'remove'){
-      const removedId = removeBlock(x,y,z);
-      if(removedId !== null){
-        addToInv(removedId, 1);
-        buildHotbar();
-        if(inventoryOpen) buildInventoryGrid();
-      }
-    } else if(action === 'place'){
-      const blockId = blockTypes[currentBlockIndex].id;
-      if(!canSpend(blockId, 1)) return; // нет блоков
-
-      const normal = hit.face.normal.clone();
-      const placeX = Math.floor(hitPos.x + normal.x);
-      const placeY = Math.floor(hitPos.y + normal.y);
-      const placeZ = Math.floor(hitPos.z + normal.z);
-
-      const key = keyFromXYZ(placeX,placeY,placeZ);
-      if(worldBlocks.has(key)) return;
-
-      // не ставим блок "внутрь игрока"
-      const testPos = player.position.clone();
-      if(
-        placeX <= testPos.x && testPos.x <= placeX+1 &&
-        placeY <= testPos.y && testPos.y <= placeY+1 &&
-        placeZ <= testPos.z && testPos.z <= placeZ+1
-      ){
-        return;
-      }
-
-      const ok = addBlock(placeX,placeY,placeZ, blockId);
-      if(ok){
-        spend(blockId, 1);
-        buildHotbar();
-        if(inventoryOpen) buildInventoryGrid();
-      }
+    const blockId = blockTypes[currentBlockIndex].id;
+    const result = interactionManager.performEdit(action, blockId);
+    if(result.inventoryChanged){
+      buildHotbar();
+      if(inventoryOpen) buildInventoryGrid();
     }
   }
 
