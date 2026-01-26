@@ -22,6 +22,39 @@
   // Pointer lock desktop
   const overlay = document.getElementById('overlay');
   const startBtn = document.getElementById('startBtn');
+  const modeButtons = Array.from(document.querySelectorAll('.modeBtn'));
+  const helpEl = document.getElementById('help');
+  const survivalHud = document.getElementById('survivalHud');
+  const healthFill = document.getElementById('healthFill');
+  const foodFill = document.getElementById('foodFill');
+
+  let gameMode = 'creative';
+  let interactionManager = null;
+
+  function setGameMode(mode){
+    gameMode = mode;
+    modeButtons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+    if (mode === 'survival') {
+      helpEl.innerHTML = `<b>Режим выживания</b>.<br>
+        Еда постепенно снижается — ешь пирожки с яблоком.<br>
+        Падение с 3 блоков отнимает половину здоровья, с 6 — смерть.`;
+      survivalHud.style.display = 'block';
+    } else {
+      helpEl.innerHTML = `<b>Режим полёта</b> (как креатив).<br>
+        Блоки и вода — объёмные, пройти сквозь них нельзя.<br><br>
+        Инвентарь: ломай блоки → они добавляются. Ставь блоки → расходуются.`;
+      survivalHud.style.display = 'none';
+    }
+    if (interactionManager) {
+      interactionManager.setMode('creative');
+    }
+  }
+
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => setGameMode(btn.dataset.mode));
+  });
 
   let isPointerLocked = false;
   let yaw = 0;
@@ -89,7 +122,8 @@
     { id: 6, name: "Гранит",     color: 0xbf7b69, rough: 0.75, metal: 0.18 },
     { id: 7, name: "Руда",       color: 0x8f93a5, rough: 0.65, metal: 0.35, emissive: 0x4458ff, emissiveIntensity: 0.3 },
     { id: 8, name: "Светящийся", color: 0xfaf5d0, rough: 0.15, metal: 0.2,  emissive: 0xfff2b0, emissiveIntensity: 0.9 },
-    { id: 9, name: "Вода",       color: 0x3a84f0, rough: 0.15, metal: 0.0, transparent: true, opacity: 0.55, isWater: true }
+    { id: 9, name: "Вода",       color: 0x3a84f0, rough: 0.15, metal: 0.0, transparent: true, opacity: 0.55, isWater: true },
+    { id: 10, name: "Пирожок с яблоком", color: 0xf3b25e, rough: 0.7, metal: 0.0, emissive: 0x5b2e1a, emissiveIntensity: 0.08 }
   ];
 
   const blockMaterials = {};
@@ -157,7 +191,7 @@
     return id;
   }
 
-  const interactionManager = createPlayerInteractionManager({
+  interactionManager = createPlayerInteractionManager({
     player,
     camera,
     worldBlocks,
@@ -178,6 +212,8 @@
     keyFromXYZ
   });
   updateVisibility();
+  setGameMode(gameMode);
+  updateSurvivalHud();
 
   // ===== Flight movement =====
   const direction = new THREE.Vector3();
@@ -187,12 +223,31 @@
   const keyState = {};
 
   let joyForward = 0, joyRight = 0, joyUp = 0;
+  const MAX_HEALTH = 100;
+  const MAX_FOOD = 100;
+  const FOOD_DECAY_RATE = 2.5;
+  const APPLE_PIE_FOOD = 35;
+  const APPLE_PIE_BLOCK_ID = 10;
+  let health = MAX_HEALTH;
+  let food = MAX_FOOD;
+  let verticalVelocity = 0;
+  let isGrounded = false;
+  let fallStartY = null;
+
+  function updateSurvivalHud(){
+    healthFill.style.width = `${(health / MAX_HEALTH) * 100}%`;
+    foodFill.style.width = `${(food / MAX_FOOD) * 100}%`;
+  }
 
   function onKey(e,down){ keyState[e.code] = down; }
   window.addEventListener('keydown', e => onKey(e,true));
   window.addEventListener('keyup',   e => onKey(e,false));
 
   function updateMovement(delta){
+    if (gameMode === 'survival') {
+      updateSurvivalMovement(delta);
+      return;
+    }
     let f = 0, r = 0, u = 0;
     if(keyState['KeyW'] || keyState['ArrowUp'])    f += 1;
     if(keyState['KeyS'] || keyState['ArrowDown'])  f -= 1;
@@ -234,6 +289,83 @@
 
     newPos.z += move.z;
     if(interactionManager.isPositionColliding(newPos)) newPos.z = player.position.z;
+
+    player.position.copy(newPos);
+  }
+
+  function updateSurvivalMovement(delta){
+    let f = 0, r = 0;
+    if(keyState['KeyW'] || keyState['ArrowUp'])    f += 1;
+    if(keyState['KeyS'] || keyState['ArrowDown'])  f -= 1;
+    if(keyState['KeyA'] || keyState['ArrowLeft'])  r -= 1;
+    if(keyState['KeyD'] || keyState['ArrowRight']) r += 1;
+
+    f += joyForward;
+    r += joyRight;
+
+    f = Math.max(-1, Math.min(1, f));
+    r = Math.max(-1, Math.min(1, r));
+
+    moveForward.value = f;
+    moveRight.value   = r;
+    moveUp.value      = 0;
+
+    direction.set(0,0,0);
+    forwardFlat.set(0,0,-1).applyEuler(new THREE.Euler(0, yaw, 0, 'YXZ')).normalize();
+    rightFlat.crossVectors(forwardFlat, new THREE.Vector3(0,1,0)).normalize();
+
+    if(moveForward.value) direction.addScaledVector(forwardFlat, moveForward.value);
+    if(moveRight.value)   direction.addScaledVector(rightFlat, moveRight.value);
+
+    if(direction.lengthSq() > 0) direction.normalize();
+
+    const SPEED = 9;
+    const move = direction.multiplyScalar(SPEED * delta);
+
+    const newPos = player.position.clone();
+
+    newPos.x += move.x;
+    if(interactionManager.isPositionColliding(newPos)) newPos.x = player.position.x;
+
+    newPos.z += move.z;
+    if(interactionManager.isPositionColliding(newPos)) newPos.z = player.position.z;
+
+    const jumpRequested = (keyState['Space'] || joyUp > 0.2);
+    const wasGrounded = isGrounded;
+    const GRAVITY = 28;
+    const JUMP_SPEED = 9;
+
+    if (wasGrounded && jumpRequested) {
+      verticalVelocity = JUMP_SPEED;
+      isGrounded = false;
+    }
+
+    verticalVelocity -= GRAVITY * delta;
+    newPos.y += verticalVelocity * delta;
+
+    if(interactionManager.isPositionColliding(newPos)){
+      if(verticalVelocity < 0 && fallStartY !== null){
+        const fallDistance = fallStartY - player.position.y;
+        if (fallDistance >= 6) {
+          health = 0;
+        } else if (fallDistance >= 3) {
+          health = Math.max(0, health - MAX_HEALTH / 2);
+        }
+        updateSurvivalHud();
+        fallStartY = null;
+      }
+
+      if (verticalVelocity < 0) {
+        isGrounded = true;
+      }
+      verticalVelocity = 0;
+      newPos.y = player.position.y;
+    } else {
+      if (wasGrounded && verticalVelocity < 0) {
+        fallStartY = player.position.y;
+      }
+      isGrounded = false;
+    }
 
     player.position.copy(newPos);
   }
@@ -429,6 +561,12 @@
     if(inventoryOpen) return;
     const blockId = blockTypes[currentBlockIndex].id;
     const result = interactionManager.performEdit(action, blockId);
+    if (gameMode === 'survival' && result.removedId === APPLE_PIE_BLOCK_ID) {
+      food = Math.min(MAX_FOOD, food + APPLE_PIE_FOOD);
+      interactionManager.addToInv(APPLE_PIE_BLOCK_ID, -1);
+      updateSurvivalHud();
+      result.inventoryChanged = true;
+    }
     if(result.inventoryChanged){
       buildHotbar();
       if(inventoryOpen) buildInventoryGrid();
@@ -612,6 +750,13 @@
     prevTime = now;
 
     updateMovement(delta);
+    if (gameMode === 'survival') {
+      const nextFood = Math.max(0, food - FOOD_DECAY_RATE * delta);
+      if (nextFood !== food) {
+        food = nextFood;
+        updateSurvivalHud();
+      }
+    }
     visibilityTimer += delta;
     if (visibilityTimer >= VISIBILITY_UPDATE_INTERVAL) {
       updateVisibility();
