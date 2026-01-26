@@ -213,7 +213,6 @@
   });
   updateVisibility();
   setGameMode(gameMode);
-  updateSurvivalHud();
 
   // ===== Flight movement =====
   const direction = new THREE.Vector3();
@@ -238,6 +237,8 @@
     healthFill.style.width = `${(health / MAX_HEALTH) * 100}%`;
     foodFill.style.width = `${(food / MAX_FOOD) * 100}%`;
   }
+
+  updateSurvivalHud();
 
   function onKey(e,down){ keyState[e.code] = down; }
   window.addEventListener('keydown', e => onKey(e,true));
